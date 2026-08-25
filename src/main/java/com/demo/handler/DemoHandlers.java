@@ -22,9 +22,10 @@ public class DemoHandlers {
             log.info("[quick-success] Job {} started (attempt {}/{})",
                     ctx.getJobId(), ctx.getAttemptCount() + 1, ctx.getMaxAttempts());
             log.info("[quick-success] Payload: {}", ctx.getPayload());
+            return "ok";
         });
 
-        registry.register("failing-task", ctx -> {
+registry.register("failing-task", ctx -> {
             log.warn("[failing-task] Job {} about to fail (attempt {}/{})",
                     ctx.getJobId(), ctx.getAttemptCount() + 1, ctx.getMaxAttempts());
             throw new RuntimeException("Simulated failure in failing-task handler");
@@ -36,11 +37,13 @@ public class DemoHandlers {
                     ctx.getJobId(), timeout, ctx.getAttemptCount() + 1, ctx.getMaxAttempts());
             Thread.sleep(timeout * 1000L);
             log.info("[long-running] Job {} completed", ctx.getJobId());
+            return "completed";
         });
 
         registry.register("callback-test", ctx -> {
             log.info("[callback-test] Job {} executing — callback URL will fire on completion",
                     ctx.getJobId());
+            return "callback-dispatched";
         });
 
         log.info("All demo handlers registered successfully");
