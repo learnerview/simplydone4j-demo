@@ -1,6 +1,0 @@
-com\demo\DemoApplication.class
-com\demo\controller\JobController.class
-com\demo\listener\DemoEventListener.class
-com\demo\handler\DemoRunner.class
-com\demo\listener\DemoEventListener$1.class
-com\demo\handler\DemoHandlers.class

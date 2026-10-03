@@ -1,75 +1,73 @@
 # SimplyDone4J Demo
 
-Demo Spring Boot application for [SimplyDone4J](https://github.com/learnerview/simplydone4j) — the embeddable, Redis-backed job scheduling engine.
+Minimal Spring Boot app that proves [SimplyDone4J](https://github.com/learnerview/simplydone4j)
+works end to end: register a handler, submit one job, watch a worker thread run it.
 
-## Prerequisites
-
-- Java 21+ and Maven 3.8+
-- Redis (start with `docker run -d --name redis -p 6379:6379 redis:7-alpine`)
-
-## Build & Run
+## Run with Docker (recommended)
 
 ```bash
-# Build the library first (required dependency)
-cd SimplyDone4J
-mvn clean install -DskipTests
-
-# Build and run the demo (sibling directory)
-cd ../simplydone4j-demo
-mvn clean package
-java -jar target/simplydone4j-demo-1.0.0.jar --spring.profiles.active=worker
+docker compose up --build
 ```
 
-The `worker` profile enables scheduling and maintenance. App starts on port 8080.
+This starts Redis and the demo, submits one job on startup, and logs the result.
+Look for `VERIFIED job ... completed with result: hello {"name":"SimplyDone4J"}`.
 
-## What it demonstrates
-
-### Auto-submitted jobs (~15 on startup)
-
-| Job type | Count | Behavior |
-|---|---|---|
-| `quick-success` | ~8 | Completes immediately, logs payload |
-| `failing-task` | 2 | Throws `RuntimeException` — triggers retry, then DLQ |
-| `callback-test` | 1 | Completes with a callback URL |
-| `long-running` | 1 | Runs for 10s with a 3s timeout (forced failure) |
-| Delayed | 1 | Scheduled 30s in the future |
-| Idempotency | 1 | Same key resubmitted — returns existing job |
-| Rate limit burst | 5 | Tests per-producer sliding window rate limiter |
-
-### REST API
-
-Base URL: `http://localhost:8080/api/jobs`
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/api/jobs` | Submit a new job |
-| `GET` | `/api/jobs/{jobId}` | Get job details |
-| `POST` | `/api/jobs/{jobId}/cancel` | Cancel a queued job |
-| `GET` | `/api/jobs/stats` | Queue statistics (sizes, rates) |
-| `GET` | `/api/jobs/stats/status` | Counts by status |
-| `GET` | `/api/jobs/stats/queues` | Queue depths by priority |
+## Run locally
 
 ```bash
-curl -X POST http://localhost:8080/api/jobs \
-  -H "Content-Type: application/json" \
-  -d '{"jobType":"quick-success","idempotencyKey":"my-key-1","priority":"HIGH","payload":{"task":"test"}}'
+# 1. the library must be in your local repo
+cd ../SimplyDone4J && mvn clean install -DskipTests
 
-curl http://localhost:8080/api/jobs/stats
+# 2. Redis
+docker run -d --name redis -p 6379:6379 redis:7-alpine
+
+# 3. the demo
+cd ../simplydone4j-demo && mvn clean package
+java -jar target/simplydone4j-demo-1.0.0.jar
 ```
 
-### Demo handlers
+Redis is required; the starter has no in-memory fallback. The app exits non-zero
+if the job does not reach a terminal state, so it doubles as a smoke test.
 
-Defined in `DemoHandlers.java`:
+## What it checks
 
-- **`quick-success`** — logs job info and completes
-- **`failing-task`** — always throws (retry + DLQ demo)
-- **`long-running`** — sleeps 10s (timeout demo with 3s limit)
-- **`callback-test`** — completes and fires the configured callback URL
+`src/main/java/com/demo/Demo.java` is the whole test:
 
-### Job events
+1. Registers a `greet` handler that logs and returns `"hello " + payload`.
+2. Submits one job (`priority=HIGH`, idempotency key `demo-1`).
+3. Polls until a terminal status (`SUCCESS`, `FAILED`, `DLQ`, `CANCELLED`),
+   then asserts it succeeded — `System.exit(1)` otherwise.
 
-`DemoEventListener` logs every lifecycle event (CREATE, START, COMPLETE, FAIL, RETRY, CANCEL).
+Status values come from the library's `JobStatus` enum: `QUEUED`, `RUNNING`,
+`RETRY_SCHEDULED`, `SUCCESS`, `FAILED`, `CANCELLED`, `DLQ`.
+
+## Verify the 2.1.0 operational features
+
+While it runs, the actuator endpoints expose the starter's instrumentation:
+
+```bash
+# health contributor contributed by the starter
+curl -s http://localhost:8080/actuator/health | jq '.components.simplyDone'
+
+# 14 simplydone4j metrics
+curl -s http://localhost:8080/actuator/metrics | jq '.names[] | select(startswith("simplydone4j"))'
+
+# per-outcome counters
+curl -s "http://localhost:8080/actuator/metrics/simplydone4j.jobs.completed?tag=outcome:SUCCESS"
+```
+
+Health reports `queueDepths` per priority, `totalQueued`, `running` and
+`deadLettered`, and flips to `DOWN` at
+`simplydone4j.health.dead-letter-threshold` (default 1) or
+`max-queue-depth` (default 100000). Set either to `0` to disable that check.
+
+## A note on `vendor/`
+
+Starter 2.1.0 is not on Maven Central yet, so its jar and pom are checked into
+`vendor/` and seeded into the image's local repository by the Dockerfile.
+**Once 2.1.0 is published, delete `vendor/` and the `COPY vendor/...` line.**
 
 ## Configuration
 
-See `src/main/resources/application.yml` for all settings.
+See `src/main/resources/application.yml`. Redis is read from `REDIS_URL`
+(default `redis://localhost:6379`).
