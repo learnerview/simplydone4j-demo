@@ -2,9 +2,15 @@ spring:
   data:
     redis:
       url: ${REDIS_URL:redis://localhost:6379}
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
 
 simplydone4j:
   key-prefix: demo
+  scheduler:
+    enabled: true
+  monitoring:
+    enabled: true
   retry:
     max-attempts: 3
     initial-delay-seconds: 1
@@ -20,3 +26,4 @@ management:
 
 server:
   port: 8080
+  shutdown: graceful
