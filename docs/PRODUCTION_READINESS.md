@@ -37,3 +37,16 @@ a demo — tiny surface, an observable smoke test, an intentionally slow/failing
 handler — is exactly what makes it unfit for production. Closing the top gaps
 would require, at minimum: an automated test suite (Testcontainers + Redis), a
 CI workflow, API authentication, and a real deployment/observability story.
+
+## Performance Baseline (to establish)
+
+No load/soak/benchmark tests currently exist in this repository. To establish a production
+baseline, run one of the following against a deployed instance and record p50/p95/p99 latency
+plus throughput:
+
+- **HTTP API.** `wrk -t4 -c100 -d30s http://host:port/endpoint` or `hey -z 30s -c 100`.
+- **Measurement points.** Submit endpoint throughput, read endpoint latency, WebSocket message
+  fanout rate, and webhook delivery lag.
+- **Record.** Store results in `docs/performance-baseline.md` (not committed to this repo yet) and
+  re-run on every release to detect regressions.
+
