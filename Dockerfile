@@ -1,6 +1,8 @@
-# The starter 2.1.0 is built locally and not yet on Maven Central, so its jar/pom are
-# seeded into the image's local repository before the build. Once 2.1.0 is published,
-# the COPY below and the vendor/ directory can both be deleted.
+# The starter 2.1.0 is published on Maven Central
+# (io.github.learnerview:simplydone4j-spring-boot-starter:2.1.0), so the COPY below
+# and the vendor/ directory are now redundant and can be deleted; the build resolves
+# 2.1.0 from Central without them. The vendored artifact is still seeded here for
+# offline/hermetic builds. See README.md "Limitations & Known Issues" and "Roadmap".
 FROM maven:3.9-eclipse-temurin-21 AS build
 WORKDIR /build
 COPY pom.xml .
